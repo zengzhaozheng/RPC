@@ -21,6 +21,7 @@ public class NIOServer {
     private ByteBuffer sendBuffer = ByteBuffer.allocate(bufferSize);
     private ByteBuffer receivebuffer = ByteBuffer.allocate(bufferSize);
     private Selector selector;
+    private boolean stop = false;
 
     public NIOServer(int port) throws IOException {
         this.port = port;
@@ -35,9 +36,13 @@ public class NIOServer {
         System.out.println("Server Start at " + this.port);
     }
 
+    public void stop() {
+        this.stop = true;
+    }
+
     //监听,检测selector上事件的变化，有则处理
     private void listener() throws IOException {
-        while (true) {
+        while (!this.stop) {
             this.selector.select();
             Set<SelectionKey> selectionKeySet = this.selector.selectedKeys();
             Iterator<SelectionKey> iterator = selectionKeySet.iterator();
@@ -46,8 +51,13 @@ public class NIOServer {
                 process(selectionKey);
                 iterator.remove();
             }
-
         }
+        try {
+            this.selector.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
     }
 
     //处理请求
@@ -74,13 +84,23 @@ public class NIOServer {
                 count = client.read(this.receivebuffer);
                 receiveText = new String(receivebuffer.array(), 0, count);
                 System.out.println("read " + receiveText + "from client");
-                client.register(this.selector, key.OP_WRITE);
+                //client.register(this.selector, key.OP_WRITE);
+
+                //write message to client
+                sendText = "i am from server";
+                this.sendBuffer.clear();
+                this.sendBuffer.put(sendText.getBytes());
+                this.sendBuffer.flip();
+                client.write(this.sendBuffer);
+               // this.stop();
+
             } catch (IOException e) {
                 System.out.println("client is closed !");
                 key.cancel();
             }
 
-        } else if (key.isValid() && key.isWritable()) {
+        }
+        /*else if (key.isValid() && key.isWritable()) {
             client = (SocketChannel) key.channel();
             this.sendBuffer.clear();
             sendText = "write info " + this.flat + " to client";
@@ -96,7 +116,7 @@ public class NIOServer {
                 key.cancel();
             }
 
-        }
+        }*/
     }
 
     public static void main(String[] args) {

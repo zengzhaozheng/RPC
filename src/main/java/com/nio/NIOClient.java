@@ -19,6 +19,7 @@ public class NIOClient {
     private String serverIP;
     private ByteBuffer sendBuffer = ByteBuffer.allocate(4096);
     private ByteBuffer receiveBuffer = ByteBuffer.allocate(4096);
+    private boolean stop = false;
 
     public void init(String serverIP, int port) throws IOException {
         this.serverIP = serverIP;
@@ -30,8 +31,13 @@ public class NIOClient {
         this.client.connect(new InetSocketAddress(this.serverIP, this.port));
     }
 
+    public void stop() {
+        this.stop = true;
+    }
+
+
     public void runSession() throws IOException {
-        while (true) {
+        while (!this.stop) {
             this.selector.select();
             Set<SelectionKey> keySet = this.selector.selectedKeys();
             Iterator<SelectionKey> it = keySet.iterator();
@@ -41,7 +47,11 @@ public class NIOClient {
                 it.remove();
             }
         }
-
+        try {
+            this.selector.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
 
     }
 
@@ -49,7 +59,6 @@ public class NIOClient {
         int count = 0;
         String receiveText;
         if (key.isValid() && key.isConnectable()) {
-            System.out.println("client connect");
             this.client = (SocketChannel) key.channel();
             //判断此通道是否正在进行连接操作
             if (this.client.isConnectionPending()) {
@@ -70,16 +79,18 @@ public class NIOClient {
             if (count > 0) {
                 receiveText = new String(receiveBuffer.array(), 0, count);
                 System.out.println("receive message from server:" + receiveText);
-                this.client.register(this.selector, key.OP_WRITE);
+                // this.client.register(this.selector, key.OP_WRITE);
             }
-        } else if (key.isValid() && key.isWritable()) {
+            this.stop();
+        }
+        /*else if (key.isValid() && key.isWritable()) {
             this.client = (SocketChannel) key.channel();
             this.sendBuffer.clear();
             this.sendBuffer.put("the messsage that is sent by clent: helle world".getBytes());
             this.sendBuffer.flip();
             this.client.write(this.sendBuffer);
             this.client.register(this.selector, key.OP_READ);
-        }
+        }*/
 
 
     }
